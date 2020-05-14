@@ -26,4 +26,4 @@ typedef struct {
 typedef struct {
     long mtype;
     Acknowledgment acks[NUM_DEVICES];
-} AckClient;
+} AckReportClient;

@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
 
     // Mi metto in attesa di ricevere gli ack sulla message queue
     int msqid = msgget(msgQueueKey, S_IRUSR | S_IWUSR);
-    AckClient ackToPrint;
+    AckReportClient ackToPrint;
     // Leggo il messaggio a me destinato, cioè quello con msgtype = mio pid
     if (msgrcv(msqid, &ackToPrint, sizeof(ackToPrint), getpid(), 0) == -1)
         errExit("<Client> receive message from Message Queue failed");

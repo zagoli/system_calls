@@ -3,3 +3,9 @@
 ///         specifiche per la gestione della MEMORIA CONDIVISA.
 
 #pragma once
+
+#include <sys/types.h>
+
+int createMemSegment(size_t size);
+
+void *attachSegment(int shmid);
