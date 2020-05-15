@@ -10,6 +10,8 @@
 #include <fcntl.h>
 #include <sys/msg.h>
 #include <string.h>
+#include <errno.h>
+#include <time.h>
 
 int main(int argc, char *argv[]) {
 
@@ -18,7 +20,10 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    int msgQueueKey = atoi(argv[1]);
+    errno = 0;
+    key_t msgQueueKey = strtoul(argv[1], NULL, 10);
+    if (errno == ERANGE)
+        errExit("<Server> failed at converting msg_queue key");
 
     // Creo il messaggio e aspetto l'input dell'utente
     Message message;
@@ -28,7 +33,7 @@ int main(int argc, char *argv[]) {
     printf("Inserire id messaggio: ");
     scanf("%d", &message.message_id);
     printf("Inserire messaggio: ");
-    scanf("%255s", &message.message);
+    fgets(message.message, 256, STDIN_FILENO);
     printf("Inserire massima distanza comunicazione per il messaggio: ");
     scanf("%lf", &message.max_distance);
 
@@ -60,13 +65,20 @@ int main(int argc, char *argv[]) {
     if (outFd == -1)
         errExit("<Client> open output file failed");
 
+    // TODO: la data non è stampata proprio come la vuole il prof
     // Scrivo ack su file di output
     char buffer[1024];
+    // Prima riga dell'output
+    sprintf(buffer, "Messaggio %d: %s\n", message.message_id, message.message);
+    bW = write(outFd, buffer, strlen(buffer));
+    if (bW == -1 || bW == 0)
+        errExit("<Client> writing on output file failed");
+    // Vari acks
     for (int i = 0; i < NUM_DEVICES; i++) {
         Acknowledgment currentAck = ackToPrint.acks[i];
         sprintf(buffer,
-                "sender: %d | receiver: %d | msg_id: %d | timestamp: %ld\n",
-                currentAck.pid_sender, currentAck.pid_receiver, currentAck.message_id, currentAck.timestamp);
+                "%d, %d, %s\n",
+                currentAck.pid_sender, currentAck.pid_receiver, ctime(&currentAck.timestamp));
         bW = write(outFd, buffer, strlen(buffer));
         if (bW == -1 || bW == 0)
             errExit("<Client> writing on output file failed");

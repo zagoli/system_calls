@@ -15,12 +15,23 @@
 #include <unistd.h>
 #include <errno.h>
 #include <stdbool.h>
+#include <sys/shm.h>
+#include <sys/wait.h>
 
+// Queste variabili sono globali in modo che possano essere viste all'interno del signal handler
+pid_t pidDevices[NUM_DEVICES];
+pid_t pidAckManager;
+int semidAckList;
+int semidBoard;
+int boardId;
+int ackListId;
+
+// Questa funzione manda una sigterm ad AckManager e ai Device, poi rimuove i semafori e i segmenti di memoria condivisa
+void stopServer(int sig);
 
 int main(int argc, char *argv[]) {
 
     // TODO: bloccare i segnali non necessari
-    // TODO: gestire la terminazione con SIGTERM
 
     if (argc != 2) {
         printf("Usage: %s msg_queue_key file_posizioni\n", argv[0]);
@@ -35,32 +46,32 @@ int main(int argc, char *argv[]) {
     // Creo due set di semafori
     // 1 - semafori per ack list
     unsigned short semAckValues[] = {1};
-    int semidAck = semCreate(1, semAckValues);
+    semidAckList = semCreate(1, semAckValues);
     // 2 - semafori per griglia posizioni
     unsigned short semGridValues[] = {0, 0, 0, 0};
-    int semidGrid = semCreate(4, semGridValues);
+    semidBoard = semCreate(4, semGridValues);
 
     // Creo i due segmenti di memoria condivisa
     // 1 - griglia 10 x 10 per movimento dei device (board)
-    int boardId = createMemSegment(sizeof(pid_t[10][10]));
+    boardId = createMemSegment(sizeof(pid_t[10][10]));
     // 2 - array di acknowledgment per ack manager
-    int ackListId = createMemSegment(sizeof(Acknowledgment[100]));
+    ackListId = createMemSegment(sizeof(Acknowledgment[100]));
 
     // Fork per ackmanager
-    pid_t pidAckManager = fork();
+    pidAckManager = fork();
     switch (pidAckManager) {
         case 0:
             // AckManager
             exit(0);
         case -1:
             errExit("<Server> fork for ack manager failed");
-        default:; // Continuo al di fuori dello switch
+        default:; // Continuo fuori dallo switch
     }
 
     // Fork per i device
     for (int i = 0; i < NUM_DEVICES; i++) {
-        pid_t pidDevice = fork();
-        switch (pidDevice) {
+        pidDevices[i] = fork();
+        switch (pidDevices[i]) {
             case 0:
                 // Device i-esimo
                 exit(0);
@@ -70,15 +81,59 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    // Gestisco la ricezione di SIGTERM
+    if (signal(SIGTERM, stopServer) == SIG_ERR)
+        errExit("<Server> setting SIGTERM handler failed");
+
     // Ciclo infinito in cui faccio muovere i device
-    // queste merde pragma sono da togliere ma per adesso servono a non evidenziare tutto il ciclo in giallo mentre lo scrivo
+    // Queste merde pragma sono da togliere ma per adesso servono a non evidenziare tutto il ciclo in giallo mentre scrivo dentro al ciclo
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wmissing-noreturn"
+    int iteration = 0;
     do {
+        // ------------------ Stampa info device --------------------------------------------
+        printf("# Step %d: device positions ########################\n", ++iteration);
+        // Sblocco il primo semaforo dei device, dovrebbero sbloccarsi gli altri in cascata
+        semOp(semidBoard, 0, 1);
+        // Ogni device stampa le sue informazioni
+        printf("#############################################\n");
+        // ----------------------------------------------------------------------------------
+        // Dormo due secondi
         sleep(2);
-
     } while (true);
 #pragma clang diagnostic pop
 
-    return 0;
+    return 0;  // Non ci dovrebbe arrivare, ma lo lascio per simpatia
+}
+
+void stopServer(int sig) {
+    // Invio un SIGTERM a AckManager
+    if (kill(pidAckManager, SIGTERM) == -1)
+        errExit("<Server> kill AckManager failed");
+    // Invio SIGTERM a tutti i device
+    for (int i = 0; i < NUM_DEVICES; i++) {
+        if (kill(pidDevices[i], SIGTERM) == -1)
+            errExit("<Server> kill device failed");
+    }
+
+    // Aspetto che i miei figli terminino
+    while (wait(NULL) != -1);
+    if (errno != ECHILD)
+        errExit("<Server> wait for children termination failed");
+
+    // Rimuovo il segmento di memoria della board
+    if (shmctl(boardId, IPC_RMID, NULL) == -1)
+        errExit("<Server> remove board failed");
+    // Rimuovo il segmento di memoria di ackList
+    if (shmctl(ackListId, IPC_RMID, NULL) == -1)
+        errExit("<Server> remove ackList failed");
+    // Rimuovo il set di semafori della board
+    if (semctl(semidBoard, 0, IPC_RMID) == -1)
+        errExit("<Server> remove semaphore set board failed");
+    // Rimuovo il set di semafori di ackList
+    if (semctl(semidAckList, 0, IPC_RMID) == -1)
+        errExit("<Server> remove semaphore set ackList failed");
+
+    // Infine, termino
+    exit(0);
 }
