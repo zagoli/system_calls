@@ -31,9 +31,7 @@ void stopServer(int sig);
 
 int main(int argc, char *argv[]) {
 
-    // TODO: bloccare i segnali non necessari
-
-    if (argc != 2) {
+    if (argc != 3) {
         printf("Usage: %s msg_queue_key file_posizioni\n", argv[0]);
         return 0;
     }
@@ -42,6 +40,10 @@ int main(int argc, char *argv[]) {
     key_t msgQueueKey = strtoul(argv[1], NULL, 10);
     if (errno == ERANGE)
         errExit("<Server> failed at converting msg_queue key");
+
+    // Blocco i segnali non necessari
+    int sig[] = {SIGTERM};
+    blockAllSignalsExcept(sig, 1);
 
     // Creo due set di semafori
     // 1 - semafori per ack list
@@ -53,9 +55,9 @@ int main(int argc, char *argv[]) {
 
     // Creo i due segmenti di memoria condivisa
     // 1 - griglia 10 x 10 per movimento dei device (board)
-    boardId = createMemSegment(sizeof(pid_t[10][10]));
+    boardId = createMemSegment(sizeof(pid_t[BOARD_SIDE_SIZE][BOARD_SIDE_SIZE]));
     // 2 - array di acknowledgment per ack manager
-    ackListId = createMemSegment(sizeof(Acknowledgment[100]));
+    ackListId = createMemSegment(sizeof(Acknowledgment[ACK_MAX]));
 
     // Fork per ackmanager
     pidAckManager = fork();
@@ -92,7 +94,7 @@ int main(int argc, char *argv[]) {
     int iteration = 0;
     do {
         // ------------------ Stampa info device --------------------------------------------
-        printf("# Step %d: device positions ########################\n", ++iteration);
+        printf("\n# Step %d: device positions ########################\n", ++iteration);
         // Sblocco il primo semaforo dei device, dovrebbero sbloccarsi gli altri in cascata
         semOp(semidBoard, 0, 1);
         // Ogni device stampa le sue informazioni

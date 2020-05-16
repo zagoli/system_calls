@@ -25,4 +25,5 @@ int semCreate(int nSems, unsigned short semValuesInit[]) {
     arg.array = semValuesInit;
     if (semctl(semid, 0, SETALL, arg) == -1)
         errExit("<Semaphore> semctl SETALL failed");
+    return semid;
 }
