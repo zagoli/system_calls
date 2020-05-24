@@ -17,4 +17,4 @@ add_executable(system_calls
         semaphore.h
         server.c
         shared_memory.c
-        shared_memory.h)
+        shared_memory.h ackmanager.h ackmanager.c)
