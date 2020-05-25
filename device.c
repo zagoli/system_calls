@@ -19,28 +19,19 @@
 #include <stdbool.h>
 #include <sys/shm.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 
 
 pid_t id;
-char *deviceFIFO;
+int fifoFD;
 
-void createFIFO(){
-    id= getpid();
-    deviceFIFO = "/tmp/dev_fifo."+id;
-    int mkfifo(char deviceFIFO, O_WRONLY);
+void createFIFO() {
+    id = getpid();
+    char deviceFIFO[PATH_MAX];
+    sprintf(deviceFIFO, "/tmp/dev_fifo.%d", id);
+    fifoFD = mkfifo(deviceFIFO, O_WRONLY);
     if (deviceFIFO == -1)
         errExit("open failed");
-
-    //Salvo il numero del processo a partire dall'ID
-    getNProcesso(id);
-}
-
-void getNProcesso(pid_t id){
-    for (int i = 0; i < pidDevices; ++i) {
-        if(id==pidDevices[i]){
-            nProcesso=i;
-        }
-    }
 }
 
 int readNextX(int nCiclo, int nProcesso){

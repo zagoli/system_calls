@@ -32,32 +32,32 @@ _Noreturn void ackmanager(int msgQueueKey, int ackListId, int semidAckList) {
         // Aspetto che il semaforo sia libero
         semOp(semidAckList, 0, -1);
 
-        // TODO: Algoritmo super inefficiente, meglio migliorarlo
         // Cerco 5 ack con lo stesso message id
-        for (int i = 0; i < ACK_MAX; i++) {
+        for (int i = 0; i < ACK_MAX - (NUM_DEVICES - 1); i++) {
             // Se message id = -1 non mi interessa
-            if (ackList[i].message_id == -1)
-                continue;
-            int positions[NUM_DEVICES] = {0}, found = 0;
-            for (int j = 0; j < ACK_MAX; j++) {
-                if (ackList[j].message_id == ackList[i].message_id) {
-                    positions[found++] = j;
+            if (!(ackList[i].message_id == -1)) {
+                int positions[NUM_DEVICES] = {0}, found = 0;
+                for (int j = i; j < ACK_MAX && found < NUM_DEVICES; j++) {
+                    if (ackList[j].message_id == ackList[i].message_id) {
+                        positions[found++] = j;
+                    }
                 }
-            }
-            // Se ho trovato 5 ack con lo stesso message id
-            if (found == NUM_DEVICES) {
-                // Creo il messaggio contenente gli ack da mandare al client
-                AckReportClient ackReportClient;
-                ackReportClient.mtype = ackList[i].message_id;
-                // Mi salvo gli ack da inviare al client
-                for (int j = 0; j < NUM_DEVICES; j++) {
-                    ackReportClient.acks[j] = ackList[positions[j]];
-                    // Marco allo stesso tempo l'ack come riscrivibile
-                    ackList[positions[j]].message_id = -1;
+                // Se ho trovato 5 ack con lo stesso message id
+                if (found == NUM_DEVICES) {
+                    // Creo il messaggio contenente gli ack da mandare al client
+                    AckReportClient ackReportClient;
+                    ackReportClient.mtype = ackList[i].message_id;
+                    // Mi salvo gli ack da inviare al client
+                    for (int j = 0; j < NUM_DEVICES; j++) {
+                        ackReportClient.acks[j] = ackList[positions[j]];
+                        // Marco allo stesso tempo l'ack come riscrivibile
+                        ackList[positions[j]].message_id = -1;
+                    }
+                    // Invio il messaggio sulla msg queue
+                    if (msgsnd(msqid, &ackReportClient, sizeof(ackReportClient) - sizeof(ackReportClient.mtype), 0) ==
+                        -1)
+                        errExit("<Ackmanager> send ackreport on message queue failed");
                 }
-                // Invio il messaggio sulla msg queue
-                if (msgsnd(msqid, &ackReportClient, sizeof(ackReportClient) - sizeof(ackReportClient.mtype), 0) == -1)
-                    errExit("<Ackmanager> send ackreport on message queue failed");
             }
         }
 
