@@ -16,7 +16,7 @@
 int main(int argc, char *argv[]) {
 
     if (argc != 2) {
-        printf("Usage: %s msg_queue_key\n", argv[0]);
+        printf("Usage: %s msg_queue_key\nCreato da Jacopo Zagoli e Gianluca Antolini\n", argv[0]);
         return 0;
     }
 
@@ -24,6 +24,9 @@ int main(int argc, char *argv[]) {
     key_t msgQueueKey = strtoul(argv[1], NULL, 10);
     if (errno == ERANGE)
         errExit("<Server> failed at converting msg_queue key");
+
+    // Blocco tutti i segnali
+    blockAllSignalsExcept(NULL, 0);
 
     // Creo il messaggio e aspetto l'input dell'utente
     Message message;
@@ -53,9 +56,11 @@ int main(int argc, char *argv[]) {
 
     // Mi metto in attesa di ricevere gli ack sulla message queue
     int msqid = msgget(msgQueueKey, S_IRUSR | S_IWUSR);
+    if (msqid == -1)
+        errExit("<Client> open message queue failed");
     AckReportClient ackToPrint;
-    // Leggo il messaggio a me destinato, cioè quello con msgtype = mio pid
-    if (msgrcv(msqid, &ackToPrint, sizeof(ackToPrint), getpid(), 0) == -1)
+    // Leggo il messaggio a me destinato, cioè quello con msgtype = message id inviato da me
+    if (msgrcv(msqid, &ackToPrint, sizeof(ackToPrint), message.message_id, 0) == -1)
         errExit("<Client> receive message from Message Queue failed");
 
     // Apro file di output
