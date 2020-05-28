@@ -47,8 +47,8 @@ int main(int argc, char *argv[]) {
     unsigned short semAckValues[] = {1};
     semidAckList = semCreate(1, semAckValues);
     // 2 - semafori per griglia posizioni
-    unsigned short semGridValues[] = {0, 0, 0, 0};
-    semidBoard = semCreate(4, semGridValues);
+    unsigned short semGridValues[NUM_DEVICES] = {0};
+    semidBoard = semCreate(NUM_DEVICES, semGridValues);
 
     // Creo i due segmenti di memoria condivisa
     // 1 - griglia 10 x 10 per movimento dei device (board)

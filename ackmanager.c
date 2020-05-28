@@ -35,7 +35,7 @@ _Noreturn void ackmanager(int msgQueueKey, int ackListId, int semidAckList) {
         // Cerco 5 ack con lo stesso message id
         for (int i = 0; i < ACK_MAX - (NUM_DEVICES - 1); i++) {
             // Se message id = -1 non mi interessa
-            if (!(ackList[i].message_id == -1)) {
+            if (ackList[i].message_id != -1) {
                 int positions[NUM_DEVICES] = {0}, found = 0;
                 for (int j = i; j < ACK_MAX && found < NUM_DEVICES; j++) {
                     if (ackList[j].message_id == ackList[i].message_id) {
