@@ -35,8 +35,14 @@ int main(int argc, char *argv[]) {
     scanf("%d", &message.pid_receiver);
     printf("Inserire id messaggio: ");
     scanf("%d", &message.message_id);
+    // Consumo i caratteri residui
+    int c;
+    do {
+        c = getchar();
+    } while (c != EOF && c != '\n');
+    // Consumati
     printf("Inserire messaggio: ");
-    fgets(message.message, 256, STDIN_FILENO);
+    fgets(message.message, 256, stdin);
     printf("Inserire massima distanza comunicazione per il messaggio: ");
     scanf("%lf", &message.max_distance);
 

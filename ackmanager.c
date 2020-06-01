@@ -33,9 +33,9 @@ _Noreturn void ackmanager(int msgQueueKey, int ackListId, int semidAckList) {
         // Aspetto che il semaforo sia libero
         semOp(semidAckList, 0, -1);
 
-        // Cerco 5 ack con lo stesso message mypid
+        // Cerco 5 ack con lo stesso message id
         for (int i = 0; i < ACK_MAX - (NUM_DEVICES - 1); i++) {
-            // Se message mypid = -1 non mi interessa
+            // Se message id = -1 non mi interessa
             if (ackList[i].message_id != -1) {
                 int positions[NUM_DEVICES] = {0}, found = 0;
                 for (int j = i; j < ACK_MAX && found < NUM_DEVICES; j++) {
@@ -43,7 +43,7 @@ _Noreturn void ackmanager(int msgQueueKey, int ackListId, int semidAckList) {
                         positions[found++] = j;
                     }
                 }
-                // Se ho trovato 5 ack con lo stesso message mypid
+                // Se ho trovato 5 ack con lo stesso message id
                 if (found == NUM_DEVICES) {
                     // Creo il messaggio contenente gli ack da mandare al client
                     AckReportClient ackReportClient;
