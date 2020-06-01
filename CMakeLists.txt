@@ -6,6 +6,8 @@ set(CMAKE_C_STANDARD 11)
 include_directories(.)
 
 add_executable(system_calls
+        device.h
+        device.c
         client.c
         defines.c
         defines.h

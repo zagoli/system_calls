@@ -10,4 +10,4 @@ int device();
 int readNextY(int nCiclo);
 int readNextX(int nCiclo);
 void createFifo();
-void getNProcesso(pid_t id);
+void checkVicini(double dist, pid_t **board, pid_t vicini[],int x,int y);
