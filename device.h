@@ -6,8 +6,4 @@
 
 #include <sys/types.h>
 
-int device();
-int readNextY(int nCiclo);
-int readNextX(int nCiclo);
-void createFifo();
-void checkVicini(double dist, pid_t **board, pid_t vicini[],int x,int y);
+int device(int nProcesso, char path[]);

@@ -16,6 +16,6 @@ int createFIFO(pid_t id) {
     sprintf(deviceFIFO, "/tmp/dev_fifo.%d", id);
     int fifoFD = mkfifo(deviceFIFO, O_WRONLY);
     if (fifoFD == -1)
-        errExit("open failed");
-    return deviceFIFO;
+        errExit("<Fifo> mkfifo failed");
+    return fifoFD;
 }

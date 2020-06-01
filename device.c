@@ -16,32 +16,30 @@
 #include <math.h>
 #include <time.h>
 
-
 pid_t id;
 int fifoFD;
 
-
-
-int readNextX(int fp, int nProcesso){
+int readNextX(int fd, int nProcesso) {
+    // TODO fare con read e lseek
     char riga[256];
 
-
     //Salvo la riga desiderata
-    while (fgets(riga, sizeof(riga), fp));
+    while (fgets(riga, sizeof(riga), fd));
 
     //Ritorno la x
-    int stop=nProcesso*4;
+    int stop = nProcesso * 4;
     return riga[stop];
 }
 
-int readNextY(int fp, int nProcesso){
+int readNextY(int fd, int nProcesso) {
+    // TODO fare con read e lseek
     char riga[256];
 
     //Salvo la riga desiderata
-    while (fgets(riga, sizeof(riga), fp));
+    while (fgets(riga, sizeof(riga), fd));
 
     //Ritorno la y
-    int stop=2+nProcesso*4;
+    int stop = 2 + nProcesso * 4;
     return riga[stop];
 }
 
@@ -64,19 +62,25 @@ void checkVicini(double dist, pid_t **board, pid_t vicini[],int x,int y){
 
 }
 
-void stopDevice(int signal){
-    close(fifoFD);
+void stopDevice(int signal) {
+    if (close(fifoFD))
+        errExit("<Device> close FIFO failed");
+    // TODO eliminare la fifo non solo chiuderla
+    // TODO dis-attach memoria condivisa
 }
 
 _Noreturn int device(int nProcesso, char path[]) {
 
     id = getpid();
     //Creo una FIFO per ogni device e salvo variabili utili del processo
-    fifoFD=createFIFO(id);
+    fifoFD = createFIFO(id);
+    // TODO aprire qua la fifo
+    // TODO attach qua memoria condivisa board e non nel ciclo
+    // TODO attach qua memoria condivisa acklist e non nel ciclo
 
     Message messaggi[MESS_DEV_MAX];
     for (int k = 0; k < MESS_DEV_MAX; ++k) {
-        messaggi[k].message_id=-1;
+        messaggi[k].message_id = -1;
     }
 
     //Blocco segnali che non siano sigterm
@@ -87,25 +91,25 @@ _Noreturn int device(int nProcesso, char path[]) {
         errExit("<Device> setting SIGTERM handler failed");
 
     //Apro il file delle posizioni
-    int fp = open(path, O_RDONLY);
-    if (fp == -1)
+    int posizioniFD = open(path, O_RDONLY);
+    if (posizioniFD == -1)
         errExit("open failed");
 
 
     //Tutte le azioni del device
-    while(true){
+    while (true) {
 
         //Leggo la prossima posizione
-        int x,y;
-        x=readNextX(fp,nProcesso);
-        y=readNextY(fp,nProcesso);
+        int x, y;
+        x = readNextX(posizioniFD, nProcesso);
+        y = readNextY(posizioniFD, nProcesso);
 
         //INVIO MESSAGGI
         //Controllo se ho messaggi
-        bool vuoto=true;
+        bool vuoto = true;
         for (int i = 0; i < MESS_DEV_MAX; ++i) {
-            if(messaggi[i].message_id!=-1){
-                vuoto=false;
+            if (messaggi[i].message_id != -1) {
+                vuoto = false;
                 break;
             }
         }
@@ -135,8 +139,6 @@ _Noreturn int device(int nProcesso, char path[]) {
 
                             //Controllo se vicino ha già ricevuto il messaggio nella lista delle ack
 
-                            // Aspetto che il semaforo sia libero
-                            semOp(semidAckList, 0, -1);
                             // Accedo alla board
                             Acknowledgment *ackList = attachSegment(ackListId);
                             bool giaRicevuto=false;
@@ -175,35 +177,27 @@ _Noreturn int device(int nProcesso, char path[]) {
                     for (int k = 0; k < NUM_DEVICES-1; ++k) {
                         vicini[k]=(pid_t)-1;
                     }
-
                 }
-            }
-
-            // Libero il semaforo
-            if (nProcesso!=NUM_DEVICES) {
-                semOp(semidBoard, nProcesso + 1, 1);
             }
         }
 
         //RICEZIONE MESSAGGI
         //Leggo eventuali messaggi
-        open(fp, O_RDONLY, O_NONBLOCK);
+        open(posizioniFD, O_RDONLY, O_NONBLOCK);
         Message messaggio;
         Acknowledgment ack;
         int nm;
-        while(read(fp, &messaggio, sizeof(Message))!=-1){
+        while (read(posizioniFD, &messaggio, sizeof(Message)) != -1) {
 
             //Letto un messaggio, creo un ack
-            messaggi[nm]=messaggio;
-            ack.message_id=messaggio.message_id;
-            ack.pid_sender=messaggio.pid_sender;
-            ack.pid_receiver=id;
-            ack.timestamp=time(NULL);
+            // TODO penso che il messaggio bisogna metterlo nel primo posto dove c'è un -1 e non a caso, altrimenti si potrebbero sovrascrivere altri messaggi
+            messaggi[nm] = messaggio;
+            ack.message_id = messaggio.message_id;
+            ack.pid_sender = messaggio.pid_sender;
+            ack.pid_receiver = id;
+            ack.timestamp = time(NULL);
 
             //Aggiungo l'ack al segmento di memoria apposito
-            // Aspetto che il semaforo sia libero
-            semOp(semidAckList, 0, -1);
-
             // Accedo alla board
             Acknowledgment *ackList = attachSegment(ackListId);
             for (int i = 0; i < ACK_MAX; ++i) {
@@ -212,27 +206,23 @@ _Noreturn int device(int nProcesso, char path[]) {
                 }
             }
 
-            // Libero il semaforo
-            semOp(semidAckList, 0, 1);
-
             nm++;
         }
 
 
         //MOVIMENTO
-        // Aspetto che il semaforo sia libero
-        semOp(semidBoard, nProcesso, -1);
 
         // Accedo alla board
         pid_t **board = attachSegment(boardId);
 
         //Se casella è libera mi inserisco
-        if(board[x][y]!=0){
-            board[x][y]=id;
+        // TODO la casella non è libera quando è =0?
+        if (board[x][y] != 0) {
+            board[x][y] = id;
         }
 
-        //Libero il semaforo
-        if (nProcesso!=NUM_DEVICES) {
+        //Libero il semaforo del prossimo processo se non sono l'ultimo
+        if (nProcesso != NUM_DEVICES - 1) {
             semOp(semidBoard, nProcesso + 1, 1);
         }
     }

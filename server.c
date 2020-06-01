@@ -6,6 +6,7 @@
 #include "shared_memory.h"
 #include "semaphore.h"
 #include "ackmanager.h"
+#include "device.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -73,6 +74,7 @@ int main(int argc, char *argv[]) {
         switch (pidDevices[i]) {
             case 0:
                 // Device i-esimo
+                device(i, argv[2]);
                 exit(0);
             case -1:
                 errExit("<Server> fork for device failed");

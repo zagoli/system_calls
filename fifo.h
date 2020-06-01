@@ -6,4 +6,4 @@
 
 #include <sys/param.h>
 
-int createFIFO(pid_t id) ;
+int createFIFO(pid_t id);
