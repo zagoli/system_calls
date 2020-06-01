@@ -7,15 +7,11 @@
 
 #include <sys/stat.h>
 #include <stdio.h>
-#include <unistd.h>
-#include <fcntl.h>
 
 
-int createFIFO(pid_t id) {
-    char deviceFIFO[PATH_MAX];
-    sprintf(deviceFIFO, "/tmp/dev_fifo.%d", id);
-    int fifoFD = mkfifo(deviceFIFO, O_WRONLY);
+void createFIFO(pid_t id, char deviceFifoPath[]) {
+    sprintf(deviceFifoPath, "/tmp/dev_fifo.%d", id);
+    int fifoFD = mkfifo(deviceFifoPath, S_IRUSR | S_IWUSR);
     if (fifoFD == -1)
         errExit("<Fifo> mkfifo failed");
-    return fifoFD;
 }

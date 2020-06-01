@@ -3,7 +3,6 @@
 
 #include "err_exit.h"
 #include "semaphore.h"
-#include "err_exit.h"
 
 #include <sys/sem.h>
 #include <sys/stat.h>

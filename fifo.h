@@ -6,4 +6,5 @@
 
 #include <sys/param.h>
 
-int createFIFO(pid_t id);
+// crea la FIFO e salva nel buffer il path della FIFO
+void createFIFO(pid_t id, char deviceFifoPath[]);

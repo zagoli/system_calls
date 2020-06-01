@@ -19,10 +19,6 @@
 // Queste variabili sono globali in modo che possano essere viste all'interno del signal handler
 pid_t pidDevices[NUM_DEVICES];
 pid_t pidAckManager;
-int semidAckList;
-int semidBoard;
-int boardId;
-int ackListId;
 
 // Questa funzione manda una sigterm ad AckManager e ai Device, poi rimuove i semafori e i segmenti di memoria condivisa
 void stopServer(int sig);
@@ -36,7 +32,7 @@ int main(int argc, char *argv[]) {
 
     errno = 0;
     key_t msgQueueKey = strtoul(argv[1], NULL, 10);
-    if (errno == ERANGE)
+    if (errno == ERANGE || errno == EINVAL)
         errExit("<Server> failed at converting msg_queue key");
 
     // Blocco i segnali non necessari

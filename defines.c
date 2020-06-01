@@ -5,8 +5,6 @@
 #include "defines.h"
 #include "err_exit.h"
 
-#include <signal.h>
-
 void blockAllSignalsExcept(int signals[], int size) {
     // Creo un set di segnali pieno
     sigset_t allSignals;

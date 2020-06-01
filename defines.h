@@ -35,5 +35,12 @@ typedef struct {
     Acknowledgment acks[NUM_DEVICES];
 } AckReportClient;
 
+// Queste variabili globali sono in questo file e non in quello del server per essere viste anche dentro a device.c.
+// Non sono passate come parametro a device perchè devono essere comunque viste all'interno del signal handler
+int semidAckList;
+int semidBoard;
+int boardId;
+int ackListId;
+
 // Questa funzione blocca tutti i segnali eccetto quelli contenuti nell'array signals, con size elementi
 void blockAllSignalsExcept(int signals[], int size);

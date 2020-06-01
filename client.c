@@ -22,7 +22,7 @@ int main(int argc, char *argv[]) {
 
     errno = 0;
     key_t msgQueueKey = strtoul(argv[1], NULL, 10);
-    if (errno == ERANGE)
+    if (errno == ERANGE || errno == EINVAL)
         errExit("<Server> failed at converting msg_queue key");
 
     // Blocco tutti i segnali
