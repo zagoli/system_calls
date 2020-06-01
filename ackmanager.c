@@ -12,7 +12,7 @@
 #include <unistd.h>
 
 // TODO: gestire ricezione di sigterm per terminare
-_Noreturn void ackmanager(int msgQueueKey, int ackListId, int semidAckList) {
+_Noreturn void ackmanager(int msgQueueKey) {
 
     // Blocco tutti i segnali ecceto SIGTERM
     int sig[] = {SIGTERM};

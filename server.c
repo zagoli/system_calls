@@ -58,7 +58,7 @@ int main(int argc, char *argv[]) {
     switch (pidAckManager) {
         case 0:
             // AckManager
-            ackmanager(msgQueueKey, ackListId, semidAckList);
+            ackmanager(msgQueueKey);
         case -1:
             errExit("<Server> fork for ack manager failed");
         default:; // Continuo fuori dallo switch

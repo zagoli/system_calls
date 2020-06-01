@@ -71,7 +71,7 @@ _Noreturn int device(int nProcesso, char path[]) {
     char fifoPath[PATH_MAX];
     createFIFO(mypid, fifoPath);
     // apro la FIFO
-    fifoFD = open(fifoPath, O_RDONLY, O_NONBLOCK);
+    fifoFD = open(fifoPath, O_RDONLY | O_NONBLOCK);
     if (fifoFD == -1)
         errExit("<Device> open FIFO failed");
     // attach memoria condivisa
@@ -103,7 +103,6 @@ _Noreturn int device(int nProcesso, char path[]) {
 
     //Tutte le azioni del device
     while (true) {
-
         // Aspetto che il semaforo sia libero
         semOp(semidBoard, nProcesso, -1);
 
