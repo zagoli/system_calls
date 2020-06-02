@@ -15,9 +15,13 @@
 #include <time.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <sys/shm.h>
 
 pid_t mypid;
 int fifoFD;
+char fifoPath[PATH_MAX];
+pid_t *board;
+Acknowledgment *ackList;
 
 void nextPositions(int posizioniFD, int *x, int *y) {
     char buf[3] = {0};
@@ -38,17 +42,17 @@ void nextPositions(int posizioniFD, int *x, int *y) {
         errExit("<Device> lseek failed");
 }
 
-void checkVicini(double dist, pid_t **board, pid_t vicini[], int x, int y) {
+void checkVicini(double dist, pid_t *board, pid_t vicini[], int x, int y) {
 
     //Controllo tutte le celle della board, se trovo un device vicino lo aggiungo alla lista dei vicini
     int c = 0;
     for (int i = 0; i < BOARD_SIDE_SIZE; ++i) {
         for (int j = 0; j < BOARD_SIDE_SIZE; ++j) {
             //Trovo device
-            if (board[i][j] != 0) {
+            if (board[j+i*BOARD_SIDE_SIZE] != 0) {
                 //Controllo se device è vicino
                 if (sqrt(((x - i) * (x - i)) + ((y - j) * (y - j))) <= (double) dist) {
-                    vicini[c] = board[i][j];
+                    vicini[c] = board[j+i*BOARD_SIDE_SIZE];
                     c++;
                 }
             }
@@ -58,26 +62,32 @@ void checkVicini(double dist, pid_t **board, pid_t vicini[], int x, int y) {
 }
 
 void stopDevice(int signal) {
-    if (close(fifoFD))
+    //Chiudo la fifo, la rimuovo e faccio il detach dei segmenti di memoria di ackList e board
+    if (close(fifoFD)==-1)
         errExit("<Device> close FIFO failed");
-    // TODO eliminare la fifo non solo chiuderla
-    // TODO dis-attach memoria condivisa
+    if(unlink(fifoPath)==-1){
+        errExit("<Device> unlink FIFO failed");
+    }
+    if(shmdt(ackList)==-1){
+        errExit("<Device> detach ackList failed");
+    }
+    if(shmdt(board)==-1){
+        errExit("<Device> detach board failed");
+    }
     exit(0);
 }
 
 _Noreturn int device(int nProcesso, char path[]) {
-    // TODO MANCANO LE STAMPE!!! penso da fare alla fine di tutto
     mypid = getpid();
     //Creo una la FIFO del device
-    char fifoPath[PATH_MAX];
     createFIFO(mypid, fifoPath);
     // apro la FIFO
     fifoFD = open(fifoPath, O_RDONLY | O_NONBLOCK);
     if (fifoFD == -1)
         errExit("<Device> open FIFO failed");
     // attach memoria condivisa
-    pid_t **board = attachSegment(boardId);
-    Acknowledgment *ackList = attachSegment(ackListId);
+    board = attachSegment(boardId);
+    ackList = attachSegment(ackListId);
 
     // inizializzo il mio storage dei messaggi
     Message messaggi[MESS_DEV_MAX];
@@ -186,8 +196,15 @@ _Noreturn int device(int nProcesso, char path[]) {
         Acknowledgment ack;
         while (read(fifoFD, &messaggio, sizeof(Message)) != 0) {
             //Letto un messaggio, creo un ack
-            // TODO penso che il messaggio bisogna metterlo nel primo posto dove c'è un -1 e non a caso, altrimenti si potrebbero sovrascrivere altri messaggi
-            messaggi[0] = messaggio; // da correggere
+
+
+            for (int j = 0; j < MESS_DEV_MAX; ++j) {
+                if (messaggi[j].message_id!=-1){
+                    messaggi[j] = messaggio;
+                    break;
+                }
+            }
+
             ack.message_id = messaggio.message_id;
             ack.pid_sender = messaggio.pid_sender;
             ack.pid_receiver = mypid;
@@ -210,9 +227,20 @@ _Noreturn int device(int nProcesso, char path[]) {
         //MOVIMENTO
 
         //Se casella è libera mi inserisco
-        if (board[x][y] == 0) {
-            board[x][y] = mypid;
+        if (board[y+x*BOARD_SIDE_SIZE] == 0) {
+            board[y+x*BOARD_SIDE_SIZE] = mypid;
         }
+
+
+        //pidD1 i_D1 j_D1 msgs: lista message_id
+        printf("%d %d %d msgs: ",mypid, x, y);
+        for (int l = 0; l < MESS_DEV_MAX; ++l) {
+            if(messaggi[l].message_id!=-1) {
+                printf("%d ", messaggi[l].message_id);
+            }
+        }
+        printf("\n");
+
 
         //Libero il semaforo del prossimo processo o del server
         semOp(semidBoard, nProcesso + 1, 1);
