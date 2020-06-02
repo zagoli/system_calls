@@ -62,6 +62,7 @@ void stopDevice(int signal) {
         errExit("<Device> close FIFO failed");
     // TODO eliminare la fifo non solo chiuderla
     // TODO dis-attach memoria condivisa
+    exit(0);
 }
 
 _Noreturn int device(int nProcesso, char path[]) {
@@ -136,8 +137,9 @@ _Noreturn int device(int nProcesso, char path[]) {
                         giaRicevutoTutti = true;
                         if (vicini[i] != -1) {
 
-                            //Controllo se vicino ha già ricevuto il messaggio nella lista delle ack
+                            //Controllo se vicino ha già ricevuto il messaggio nella lista delle ack e aspetto il semaforo
                             bool giaRicevuto = false;
+                            semOp(semidAckList, 0, -1);
                             for (int k = 0; k < ACK_MAX; ++k) {
                                 if (ackList[k].message_id == messaggi[k].message_id &&
                                     ackList[k].pid_sender == messaggi[k].pid_receiver) {
@@ -147,6 +149,7 @@ _Noreturn int device(int nProcesso, char path[]) {
                                     giaRicevutoTutti = false;
                                 }
                             }
+                            semOp(semidAckList, 0, 1);
 
                             //Se non l'ha gia ricevuto, glielo posso mandare
                             if (giaRicevuto == false) {
@@ -181,17 +184,17 @@ _Noreturn int device(int nProcesso, char path[]) {
         //Leggo eventuali messaggi
         Message messaggio;
         Acknowledgment ack;
-        int nm;
-        while (read(fifoFD, &messaggio, sizeof(Message)) != -1) {
+        while (read(fifoFD, &messaggio, sizeof(Message)) != 0) {
             //Letto un messaggio, creo un ack
             // TODO penso che il messaggio bisogna metterlo nel primo posto dove c'è un -1 e non a caso, altrimenti si potrebbero sovrascrivere altri messaggi
-            messaggi[nm] = messaggio;
+            messaggi[0] = messaggio; // da correggere
             ack.message_id = messaggio.message_id;
             ack.pid_sender = messaggio.pid_sender;
             ack.pid_receiver = mypid;
             ack.timestamp = time(NULL);
 
-            //Aggiungo l'ack al segmento di memoria apposito
+            //Aggiungo l'ack al segmento di memoria apposito aspettando il semaforo
+            semOp(semidAckList, 0, -1);
             for (int i = 0; i < ACK_MAX; ++i) {
                 if (ackList[i].message_id == -1) {
                     // Scrivo messaggio in acklist ed esco dal ciclo
@@ -199,8 +202,8 @@ _Noreturn int device(int nProcesso, char path[]) {
                     break;
                 }
             }
+            semOp(semidAckList, 0, 1);
 
-            nm++;
         }
 
 
@@ -211,10 +214,8 @@ _Noreturn int device(int nProcesso, char path[]) {
             board[x][y] = mypid;
         }
 
-        //Libero il semaforo del prossimo processo se non sono l'ultimo
-        if (nProcesso != NUM_DEVICES - 1) {
-            semOp(semidBoard, nProcesso + 1, 1);
-        }
+        //Libero il semaforo del prossimo processo o del server
+        semOp(semidBoard, nProcesso + 1, 1);
     }
 
 }

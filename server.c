@@ -43,13 +43,22 @@ int main(int argc, char *argv[]) {
     // 1 - semafori per ack list
     unsigned short semAckValues[] = {1};
     semidAckList = semCreate(1, semAckValues);
-    // 2 - semafori per griglia posizioni
-    unsigned short semGridValues[NUM_DEVICES] = {0};
-    semidBoard = semCreate(NUM_DEVICES, semGridValues);
+    // 2 - semafori per griglia posizioni, più un semaforo di sincronizzazione col server
+    unsigned short semGridValues[NUM_DEVICES + 1] = {0};
+    semidBoard = semCreate(NUM_DEVICES + 1, semGridValues);
 
     // Creo i due segmenti di memoria condivisa
     // 1 - griglia 10 x 10 per movimento dei device (board)
-    boardId = createMemSegment(sizeof(pid_t[BOARD_SIDE_SIZE][BOARD_SIDE_SIZE]));
+    boardId = createMemSegment(sizeof(pid_t) * BOARD_SIDE_SIZE * BOARD_SIDE_SIZE);
+    // Inizializzo a zero la board
+    pid_t *board = (pid_t *) attachSegment(boardId);
+    for (int j = 0; j < BOARD_SIDE_SIZE; j++) {
+        for (int i = 0; i < BOARD_SIDE_SIZE; i++) {
+            board[i + j * BOARD_SIDE_SIZE] = 0;
+        }
+    }
+    if (shmdt(board) == -1)
+        errExit("<Server> failed to detach board");
     // 2 - array di acknowledgment per ack manager
     ackListId = createMemSegment(sizeof(Acknowledgment[ACK_MAX]));
 
@@ -71,7 +80,6 @@ int main(int argc, char *argv[]) {
             case 0:
                 // Device i-esimo
                 device(i, argv[2]);
-                exit(0);
             case -1:
                 errExit("<Server> fork for device failed");
             default:; // Continuo la mia vita fuori dallo switch
@@ -89,7 +97,8 @@ int main(int argc, char *argv[]) {
         printf("\n# Step %d: device positions ########################\n", iteration);
         // Sblocco il primo semaforo dei device, dovrebbero sbloccarsi gli altri in cascata
         semOp(semidBoard, 0, 1);
-        // Ogni device stampa le sue informazioni
+        // Aspetto che ogni device stampi le sue informazioni
+        semOp(semidBoard, NUM_DEVICES, -1);
         printf("#############################################\n");
         // ----------------------------------------------------------------------------------
         // Dormo due secondi

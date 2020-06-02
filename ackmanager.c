@@ -10,22 +10,35 @@
 #include <sys/stat.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <sys/shm.h>
+#include <stdlib.h>
 
-// TODO: gestire ricezione di sigterm per terminare
+//Globale per eliminare tutto dopo
+int msqid;
+Acknowledgment *ackList;
+
+void quit(int sig);
+
 _Noreturn void ackmanager(int msgQueueKey) {
 
-    // Blocco tutti i segnali ecceto SIGTERM
+    // Blocco tutti i segnali eccetto SIGTERM
     int sig[] = {SIGTERM};
     blockAllSignalsExcept(sig, 1);
 
+    //Gestisco SIGTERM
+    if (signal(SIGTERM, quit) == SIG_ERR)
+        errExit("<Ackmanager> setting SIGTERM handler failed");
+
     // Creo la coda di messaggi
-    int msqid = msgget(msgQueueKey, IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
+    msqid = msgget(msgQueueKey, IPC_CREAT | IPC_EXCL | S_IRUSR | S_IWUSR);
     if (msqid == -1)
         errExit("<Ackmanager> create message queue failed");
 
     // Attacco la memoria per la lista e la inizializzo
-    Acknowledgment *ackList = attachSegment(ackListId);
+    ackList = attachSegment(ackListId);
+    semOp(semidAckList, 0, -1);
     for (int i = 0; i < ACK_MAX; i++) { ackList[i].message_id = -1; }
+    semOp(semidAckList, 0, 1);
 
     // Ogni 5 secondi controllo la lista di messaggi
     while (true) {
@@ -65,4 +78,12 @@ _Noreturn void ackmanager(int msgQueueKey) {
         // Ora che ho finito libero il semaforo
         semOp(semidAckList, 0, 1);
     }
+}
+
+void quit(int sig) {
+    if (shmdt(ackList) == -1)
+        errExit("<Ackmanager> detach acklist failed");
+    if (msgctl(msqid, IPC_RMID, NULL) == -1)
+        errExit("<Ackmanager> failed to remove message queue");
+    exit(0);
 }
