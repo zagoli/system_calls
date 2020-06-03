@@ -60,6 +60,8 @@ int main(int argc, char *argv[]) {
     if (close(fifoFd) == -1)
         errExit("<Client> close fifo failed");
 
+    printf("In attesa di riscontro...\n");
+
     // Mi metto in attesa di ricevere gli ack sulla message queue
     int msqid = msgget(msgQueueKey, S_IRUSR | S_IWUSR);
     if (msqid == -1)

@@ -43,16 +43,16 @@ void nextPositions(int posizioniFD, int *x, int *y) {
 }
 
 void checkVicini(double dist, pid_t *board, pid_t vicini[], int x, int y) {
-
     //Controllo tutte le celle della board, se trovo un device vicino lo aggiungo alla lista dei vicini
     int c = 0;
-    for (int i = 0; i < BOARD_SIDE_SIZE; ++i) {
-        for (int j = 0; j < BOARD_SIDE_SIZE; ++j) {
-            //Trovo device
-            if (board[j+i*BOARD_SIDE_SIZE] != 0) {
+    for (int i = 0; i < BOARD_SIDE_SIZE; i++) {
+        for (int j = 0; j < BOARD_SIDE_SIZE; j++) {
+            //Trovo device tranne me stesso
+            if (board[j + i * BOARD_SIDE_SIZE] != 0) {
                 //Controllo se device è vicino
-                if (sqrt(((x - i) * (x - i)) + ((y - j) * (y - j))) <= (double) dist) {
-                    vicini[c] = board[j+i*BOARD_SIDE_SIZE];
+                double distanza = (double) sqrt(((x - i) * (x - i)) + ((y - j) * (y - j)));
+                if (distanza <= (double) dist && distanza != 0) {
+                    vicini[c] = board[j + i * BOARD_SIDE_SIZE];
                     c++;
                 }
             }
@@ -63,15 +63,15 @@ void checkVicini(double dist, pid_t *board, pid_t vicini[], int x, int y) {
 
 void stopDevice(int signal) {
     //Chiudo la fifo, la rimuovo e faccio il detach dei segmenti di memoria di ackList e board
-    if (close(fifoFD)==-1)
+    if (close(fifoFD) == -1)
         errExit("<Device> close FIFO failed");
-    if(unlink(fifoPath)==-1){
+    if (unlink(fifoPath) == -1) {
         errExit("<Device> unlink FIFO failed");
     }
-    if(shmdt(ackList)==-1){
+    if (shmdt(ackList) == -1) {
         errExit("<Device> detach ackList failed");
     }
-    if(shmdt(board)==-1){
+    if (shmdt(board) == -1) {
         errExit("<Device> detach board failed");
     }
     exit(0);
@@ -91,7 +91,7 @@ _Noreturn int device(int nProcesso, char path[]) {
 
     // inizializzo il mio storage dei messaggi
     Message messaggi[MESS_DEV_MAX];
-    for (int k = 0; k < MESS_DEV_MAX; ++k) {
+    for (int k = 0; k < MESS_DEV_MAX; k++) {
         messaggi[k].message_id = -1;
     }
 
@@ -133,30 +133,27 @@ _Noreturn int device(int nProcesso, char path[]) {
 
         //invio
         if (vuoto == false) {
-            //Trovo i vicini
-            pid_t vicini[NUM_DEVICES - 1] = {(pid_t) -1};
+            //Trovo i vicini CON INIZIALIZZATORE ARRAY STRANO CHE FUNZIONA SOLO SU GCC
+            pid_t vicini[NUM_DEVICES - 1] = {[0 ... NUM_DEVICES - 2](pid_t) -1};
             for (int i = 0; i < MESS_DEV_MAX; ++i) {
+                //TODO qua va il controllo per vedere se tutti l'hanno ricevuto (usa continue; dopo che l'hai eliminato eventualmente)
                 if (messaggi[i].message_id != -1) {
                     double dist = messaggi[i].max_distance;
                     checkVicini(dist, board, vicini, x, y);
 
-                    bool giaRicevutoTutti = true;
 
                     //una volta trovati i vicini mando ad ognuno il messaggio in questione, se non l'hanno già ricevuto
-                    for (int j = 0; j < NUM_DEVICES - 1; ++j) {
-                        giaRicevutoTutti = true;
-                        if (vicini[i] != -1) {
+                    for (int j = 0; j < NUM_DEVICES - 1; j++) {
+                        if (vicini[j] != -1) {
 
                             //Controllo se vicino ha già ricevuto il messaggio nella lista delle ack e aspetto il semaforo
                             bool giaRicevuto = false;
                             semOp(semidAckList, 0, -1);
-                            for (int k = 0; k < ACK_MAX; ++k) {
-                                if (ackList[k].message_id == messaggi[k].message_id &&
-                                    ackList[k].pid_sender == messaggi[k].pid_receiver) {
+                            for (int k = 0; k < ACK_MAX; k++) {
+                                if (ackList[k].message_id == messaggi[i].message_id &&
+                                    vicini[j] == ackList[k].pid_receiver) {
                                     giaRicevuto = true;
                                     break;
-                                } else {
-                                    giaRicevutoTutti = false;
                                 }
                             }
                             semOp(semidAckList, 0, 1);
@@ -165,7 +162,7 @@ _Noreturn int device(int nProcesso, char path[]) {
                             if (giaRicevuto == false) {
                                 //Apro la fifo del device vicino
                                 char deviceVicinoFIFO[PATH_MAX];
-                                sprintf(deviceVicinoFIFO, "/tmp/dev_fifo.%d", vicini[i]);
+                                sprintf(deviceVicinoFIFO, "/tmp/dev_fifo.%d", vicini[j]);
                                 int vicinoFD = open(deviceVicinoFIFO, O_WRONLY | O_NONBLOCK);
                                 if (vicinoFD == -1)
                                     errExit("<Device> open Fifo vicino failed");
@@ -178,12 +175,12 @@ _Noreturn int device(int nProcesso, char path[]) {
                     }
 
                     //Hanno gia ricevuto tutti il messaggio, lo cancello
-                    if (giaRicevutoTutti) {
+                    /*if (giaRicevutoTutti) {
                         messaggi[i].message_id = -1;
-                    }
+                    }*/
 
                     //Svuoto la lista dei vicini per passare al prossimo messaggio
-                    for (int k = 0; k < NUM_DEVICES - 1; ++k) {
+                    for (int k = 0; k < NUM_DEVICES - 1; k++) {
                         vicini[k] = (pid_t) -1;
                     }
                 }
@@ -197,9 +194,8 @@ _Noreturn int device(int nProcesso, char path[]) {
         while (read(fifoFD, &messaggio, sizeof(Message)) != 0) {
             //Letto un messaggio, creo un ack
 
-
-            for (int j = 0; j < MESS_DEV_MAX; ++j) {
-                if (messaggi[j].message_id!=-1){
+            for (int j = 0; j < MESS_DEV_MAX; j++) {
+                if (messaggi[j].message_id == -1) {
                     messaggi[j] = messaggio;
                     break;
                 }
@@ -212,7 +208,7 @@ _Noreturn int device(int nProcesso, char path[]) {
 
             //Aggiungo l'ack al segmento di memoria apposito aspettando il semaforo
             semOp(semidAckList, 0, -1);
-            for (int i = 0; i < ACK_MAX; ++i) {
+            for (int i = 0; i < ACK_MAX; i++) {
                 if (ackList[i].message_id == -1) {
                     // Scrivo messaggio in acklist ed esco dal ciclo
                     ackList[i] = ack;
@@ -227,15 +223,15 @@ _Noreturn int device(int nProcesso, char path[]) {
         //MOVIMENTO
 
         //Se casella è libera mi inserisco
-        if (board[y+x*BOARD_SIDE_SIZE] == 0) {
-            board[y+x*BOARD_SIDE_SIZE] = mypid;
+        if (board[y + x * BOARD_SIDE_SIZE] == 0) {
+            board[y + x * BOARD_SIDE_SIZE] = mypid;
         }
 
 
         //pidD1 i_D1 j_D1 msgs: lista message_id
-        printf("%d %d %d msgs: ",mypid, x, y);
+        printf("%d %d %d msgs: ", mypid, x, y);
         for (int l = 0; l < MESS_DEV_MAX; ++l) {
-            if(messaggi[l].message_id!=-1) {
+            if (messaggi[l].message_id != -1) {
                 printf("%d ", messaggi[l].message_id);
             }
         }
