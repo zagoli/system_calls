@@ -6,6 +6,7 @@
 #include "shared_memory.h"
 #include "semaphore.h"
 #include "fifo.h"
+#include "server.c"
 
 #include <stdio.h>
 #include <unistd.h>
@@ -131,13 +132,39 @@ _Noreturn int device(int nProcesso, char path[]) {
             }
         }
 
+
+        bool giaRicevuto;
+        int countRicevuti=0;
         //invio
         if (vuoto == false) {
             //Trovo i vicini CON INIZIALIZZATORE ARRAY STRANO CHE FUNZIONA SOLO SU GCC
             pid_t vicini[NUM_DEVICES - 1] = {[0 ... NUM_DEVICES - 2](pid_t) -1};
             for (int i = 0; i < MESS_DEV_MAX; ++i) {
-                //TODO qua va il controllo per vedere se tutti l'hanno ricevuto (usa continue; dopo che l'hai eliminato eventualmente)
+
                 if (messaggi[i].message_id != -1) {
+
+                    //Controllo se per caso non hanno già ricevuto tutti il messaggio(countRicevuti=4), in caso lo cancello e passo al prossimo
+                    countRicevuti=0;
+                    semOp(semidAckList, 0, -1);
+                    for (int k = 0; k < NUM_DEVICES; ++k) {//Scorro la lista dei devices
+                        for (int l = 0; l < ACK_MAX; ++l) {//Scorro la lista degli ack per ogni device (escluso me stesso)
+                            if (ackList[l].message_id == messaggi[i].message_id &&
+                                ackList[l].pid_receiver == pidDevices[k]&&
+                                pidDevices[k]!=mypid) {
+                                countRicevuti++;
+                                break;
+                            }
+                        }
+                    }
+                    //In queso caso cancello il messaggio e passo al prossimo messaggio usando continue
+                    if (countRicevuti==4){
+                        messaggi[i].message_id=-1;
+                        semOp(semidAckList, 0, 1);
+                        continue;
+                    }
+                    //Altrimenti avanzo e passo all'invio
+                    semOp(semidAckList, 0, 1);
+
                     double dist = messaggi[i].max_distance;
                     checkVicini(dist, board, vicini, x, y);
 
@@ -147,7 +174,7 @@ _Noreturn int device(int nProcesso, char path[]) {
                         if (vicini[j] != -1) {
 
                             //Controllo se vicino ha già ricevuto il messaggio nella lista delle ack e aspetto il semaforo
-                            bool giaRicevuto = false;
+                            giaRicevuto = false;
                             semOp(semidAckList, 0, -1);
                             for (int k = 0; k < ACK_MAX; k++) {
                                 if (ackList[k].message_id == messaggi[i].message_id &&
@@ -174,10 +201,6 @@ _Noreturn int device(int nProcesso, char path[]) {
                         }
                     }
 
-                    //Hanno gia ricevuto tutti il messaggio, lo cancello
-                    /*if (giaRicevutoTutti) {
-                        messaggi[i].message_id = -1;
-                    }*/
 
                     //Svuoto la lista dei vicini per passare al prossimo messaggio
                     for (int k = 0; k < NUM_DEVICES - 1; k++) {
