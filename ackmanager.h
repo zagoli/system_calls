@@ -5,4 +5,4 @@
 
 // TODO: da aggiungere a Makefile
 // Ciclo principale di ackmanager
-_Noreturn void ackmanager(int msgQueueKey, int ackListId, int semidAckList);
+_Noreturn void ackmanager(int msgQueueKey);

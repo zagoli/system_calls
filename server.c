@@ -16,9 +16,9 @@
 #include <sys/shm.h>
 #include <sys/wait.h>
 
-// Queste variabili sono globali in modo che possano essere viste all'interno del signal handler
-pid_t pidDevices[NUM_DEVICES];
+// Questa variabile è globale in modo che possa essere vista all'interno del signal handler. Le altre sono in define.h perchè servono anche in altri file
 pid_t pidAckManager;
+pid_t pidDevices[NUM_DEVICES];
 
 // Questa funzione manda una sigterm ad AckManager e ai Device, poi rimuove i semafori e i segmenti di memoria condivisa
 void stopServer(int sig);
@@ -43,13 +43,22 @@ int main(int argc, char *argv[]) {
     // 1 - semafori per ack list
     unsigned short semAckValues[] = {1};
     semidAckList = semCreate(1, semAckValues);
-    // 2 - semafori per griglia posizioni
-    unsigned short semGridValues[NUM_DEVICES] = {0};
-    semidBoard = semCreate(NUM_DEVICES, semGridValues);
+    // 2 - semafori per device
+    unsigned short semBoardValues[NUM_DEVICES] = {0};
+    semidBoard = semCreate(NUM_DEVICES, semBoardValues);
 
     // Creo i due segmenti di memoria condivisa
     // 1 - griglia 10 x 10 per movimento dei device (board)
-    boardId = createMemSegment(sizeof(pid_t[BOARD_SIDE_SIZE][BOARD_SIDE_SIZE]));
+    boardId = createMemSegment(sizeof(pid_t) * BOARD_SIDE_SIZE * BOARD_SIDE_SIZE);
+    // Inizializzo a zero la board
+    pid_t *board = (pid_t *) attachSegment(boardId);
+    for (int j = 0; j < BOARD_SIDE_SIZE; j++) {
+        for (int i = 0; i < BOARD_SIDE_SIZE; i++) {
+            board[i + j * BOARD_SIDE_SIZE] = 0;
+        }
+    }
+    if (shmdt(board) == -1)
+        errExit("<Server> failed to detach board");
     // 2 - array di acknowledgment per ack manager
     ackListId = createMemSegment(sizeof(Acknowledgment[ACK_MAX]));
 
@@ -58,7 +67,7 @@ int main(int argc, char *argv[]) {
     switch (pidAckManager) {
         case 0:
             // AckManager
-            ackmanager(msgQueueKey, ackListId, semidAckList);
+            ackmanager(msgQueueKey);
         case -1:
             errExit("<Server> fork for ack manager failed");
         default:; // Continuo fuori dallo switch
@@ -71,7 +80,6 @@ int main(int argc, char *argv[]) {
             case 0:
                 // Device i-esimo
                 device(i, argv[2]);
-                exit(0);
             case -1:
                 errExit("<Server> fork for device failed");
             default:; // Continuo la mia vita fuori dallo switch
@@ -89,8 +97,7 @@ int main(int argc, char *argv[]) {
         printf("\n# Step %d: device positions ########################\n", iteration);
         // Sblocco il primo semaforo dei device, dovrebbero sbloccarsi gli altri in cascata
         semOp(semidBoard, 0, 1);
-        // Ogni device stampa le sue informazioni
-        printf("#############################################\n");
+        // Aspetto che ogni device stampi le sue informazioni, la riga di chiusura la stampa l'ultimo device
         // ----------------------------------------------------------------------------------
         // Dormo due secondi
         sleep(2);
@@ -101,19 +108,23 @@ int main(int argc, char *argv[]) {
 
 void stopServer(int sig) {
     // Invio un SIGTERM a AckManager
+	printf("\nServer dedding ackmanager\n");
     if (kill(pidAckManager, SIGTERM) == -1)
         errExit("<Server> kill AckManager failed");
     // Invio SIGTERM a tutti i device
     for (int i = 0; i < NUM_DEVICES; i++) {
+		printf("Server dedding device with pid %d\n", pidDevices[i]);
         if (kill(pidDevices[i], SIGTERM) == -1)
             errExit("<Server> kill device failed");
     }
 
     // Aspetto che i miei figli terminino
     while (wait(NULL) != -1);
-    if (errno != ECHILD)
-        errExit("<Server> wait for children termination failed");
+    if (errno != ECHILD){
+        errExit("<Server> wait for children termination failed");}
+	printf("Server successfully killed all his childrens\n");
 
+	printf("Server removing garbage\n");
     // Rimuovo il segmento di memoria della board
     if (shmctl(boardId, IPC_RMID, NULL) == -1)
         errExit("<Server> remove board failed");
@@ -128,5 +139,6 @@ void stopServer(int sig) {
         errExit("<Server> remove semaphore set ackList failed");
 
     // Infine, termino
+	printf("Server ded\n");
     exit(0);
 }

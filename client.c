@@ -35,8 +35,14 @@ int main(int argc, char *argv[]) {
     scanf("%d", &message.pid_receiver);
     printf("Inserire id messaggio: ");
     scanf("%d", &message.message_id);
+    // Consumo i caratteri residui
+    int c;
+    do {
+        c = getchar();
+    } while (c != EOF && c != '\n');
+    // Consumati
     printf("Inserire messaggio: ");
-    fgets(message.message, 256, STDIN_FILENO);
+    fgets(message.message, 256, stdin);
     printf("Inserire massima distanza comunicazione per il messaggio: ");
     scanf("%lf", &message.max_distance);
 
@@ -55,6 +61,7 @@ int main(int argc, char *argv[]) {
         errExit("<Client> close fifo failed");
 
     // Mi metto in attesa di ricevere gli ack sulla message queue
+	printf("Client waiting for response\n");
     int msqid = msgget(msgQueueKey, S_IRUSR | S_IWUSR);
     if (msqid == -1)
         errExit("<Client> open message queue failed");
@@ -74,7 +81,7 @@ int main(int argc, char *argv[]) {
     // Scrivo ack su file di output
     char buffer[1024];
     // Prima riga dell'output
-    sprintf(buffer, "Messaggio %d: %s\n", message.message_id, message.message);
+    sprintf(buffer, "Messaggio %d: %s", message.message_id, message.message);
     bW = write(outFd, buffer, strlen(buffer));
     if (bW == -1 || bW == 0)
         errExit("<Client> writing on output file failed");
@@ -82,7 +89,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < NUM_DEVICES; i++) {
         Acknowledgment currentAck = ackToPrint.acks[i];
         sprintf(buffer,
-                "%d, %d, %s\n",
+                "%d, %d, %s",
                 currentAck.pid_sender, currentAck.pid_receiver, ctime(&currentAck.timestamp));
         bW = write(outFd, buffer, strlen(buffer));
         if (bW == -1 || bW == 0)
@@ -94,6 +101,7 @@ int main(int argc, char *argv[]) {
         errExit("<Client> closing out file failed");
 
     // Termino
+	printf("Client dedded\n");
 
     return 0;
 }
