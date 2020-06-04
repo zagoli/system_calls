@@ -24,7 +24,7 @@ $(OBJDIR):
 $(OBJDIR)/%.o: %.c
 	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ -c $<
 
-run: clean server
+run: clean client server
 	@./server 100 input/file_posizioni.txt
 
 clean:

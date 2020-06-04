@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <sys/shm.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 //Globale per eliminare tutto dopo
 int msqid;
@@ -80,10 +81,12 @@ _Noreturn void ackmanager(int msgQueueKey) {
     }
 }
 
-void quit(int sig) {
+void quit(int sig){
     if (shmdt(ackList) == -1)
         errExit("<Ackmanager> detach acklist failed");
-    if (msgctl(msqid, IPC_RMID, NULL) == -1)
-        errExit("<Ackmanager> failed to remove message queue");
+    if (msgctl(msqid, IPC_RMID, NULL) == -1){
+        errExit("<Ackmanager> failed to remove message queue");}
+	
+	printf("	Ackmanager dedded\n");
     exit(0);
 }
