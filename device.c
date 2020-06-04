@@ -6,7 +6,6 @@
 #include "shared_memory.h"
 #include "semaphore.h"
 #include "fifo.h"
-#include "server.c"
 
 #include <stdio.h>
 #include <unistd.h>
