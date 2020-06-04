@@ -6,6 +6,7 @@
 #include "shared_memory.h"
 #include "semaphore.h"
 #include "fifo.h"
+#include "server.c"
 
 #include <stdio.h>
 #include <unistd.h>
@@ -17,6 +18,7 @@
 #include <errno.h>
 #include <sys/shm.h>
 
+// Variabili globali che devono essere lette all'interno del signal handler
 pid_t mypid;
 int fifoFD;
 char fifoPath[PATH_MAX];
@@ -65,8 +67,8 @@ _Noreturn int device(int nProcesso, char path[]) {
 
     //Tutte le azioni del device
     while (true) {
-        
-		// Aspetto che il semaforo sia libero
+
+        // Aspetto che il semaforo sia libero
         semOp(semidBoard, nProcesso, -1);
 
         //Leggo la prossima posizione
@@ -82,7 +84,7 @@ _Noreturn int device(int nProcesso, char path[]) {
                 break;
             }
         }
-        
+
         // Se ho almeno un messaggio da inviare
         if (vuoto == false) {
             // Per ogni messaggio
@@ -216,7 +218,7 @@ _Noreturn int device(int nProcesso, char path[]) {
 		} else {
 			printf("#############################################\n");
 		}
-        
+
     }
 
 }
