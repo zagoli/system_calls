@@ -64,18 +64,21 @@ _Noreturn int device(int nProcesso, char path[]) {
     if (lseek(posizioniFD, 4 * nProcesso, SEEK_SET) == -1)
         errExit("<Device> lseek failed");
 
-    //Tutte le azioni del device
+    // Posizione del device nella board
+    int x = -1, y = -1, oldX = -1, oldY = -1;
+
+    // Tutte le azioni del device
     while (true) {
 
         // Aspetto che il semaforo sia libero
         semOp(semidBoard, nProcesso, -1);
 
-        //Leggo la prossima posizione
-        int x, y;
-        nextPositions(posizioniFD, &x, &y);
+        //Leggo la prima posizione solo se sono al primo giro
+        if (x == -1 && y == -1)
+            nextPositions(posizioniFD, &x, &y);
 
         //-------------------------------INVIO MESSAGGI-------------------------------
-	    //Controllo se ho messaggi
+        //Controllo se ho messaggi
         bool vuoto = true;
         for (int i = 0; i < MESS_DEV_MAX; ++i) {
             if (messaggi[i].message_id != -1) {
@@ -189,18 +192,24 @@ _Noreturn int device(int nProcesso, char path[]) {
             }
 
         }
-		//-------------------------------------------------------------------
-
+        //-------------------------------------------------------------------
 
         //--------------------------MOVIMENTO--------------------------------
+        // Leggo le prossime posizioni
+        nextPositions(posizioniFD, &x, &y);
         //Se casella è libera mi inserisco
         if (board[y + x * BOARD_SIDE_SIZE] == 0) {
             board[y + x * BOARD_SIDE_SIZE] = mypid;
+            if (oldX != -1 && oldY != -1) {
+                board[oldY + oldX * BOARD_SIDE_SIZE] = (pid_t) 0;
+            }
         }
-		//-------------------------------------------------------------------
+        oldX = x;
+        oldY = y;
+        //-------------------------------------------------------------------
 
-		// Stampa info device in questo stile:
-        //pidD1 i_D1 j_D1 msgs: lista message_id
+        // Stampa info device in questo stile:
+        // pidD1 i_D1 j_D1 msgs: lista message_id
         printf("%d %d %d msgs: ", mypid, x, y);
         for (int l = 0; l < MESS_DEV_MAX; l++) {
             if (messaggi[l].message_id != -1) {
@@ -208,7 +217,6 @@ _Noreturn int device(int nProcesso, char path[]) {
             }
         }
         printf("\n");
-
 
         //Libero il semaforo del prossimo
 		// Se sono l'ultimo processo, invece di liberare un semaforo stampo la riga di chiusura delle info device
