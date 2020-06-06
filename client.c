@@ -60,8 +60,6 @@ int main(int argc, char *argv[]) {
     if (close(fifoFd) == -1)
         errExit("<Client> close fifo failed");
 
-    printf("In attesa di riscontro...\n");
-
     // Mi metto in attesa di ricevere gli ack sulla message queue
 	printf("Client waiting for response\n");
     int msqid = msgget(msgQueueKey, S_IRUSR | S_IWUSR);
@@ -79,7 +77,6 @@ int main(int argc, char *argv[]) {
     if (outFd == -1)
         errExit("<Client> open output file failed");
 
-    // TODO: la data non è stampata proprio come la vuole il prof
     // Scrivo ack su file di output
     char buffer[1024];
     // Prima riga dell'output
@@ -90,9 +87,13 @@ int main(int argc, char *argv[]) {
     // Vari acks
     for (int i = 0; i < NUM_DEVICES; i++) {
         Acknowledgment currentAck = ackToPrint.acks[i];
+        char timeBuffer[20];
+        struct tm *tm_info;
+        tm_info = localtime(&currentAck.timestamp);
+        strftime(timeBuffer, 20, "%Y-%m-%d %H:%M:%S", tm_info);
         sprintf(buffer,
-                "%d, %d, %s",
-                currentAck.pid_sender, currentAck.pid_receiver, ctime(&currentAck.timestamp));
+                "%d, %d, %s\n",
+                currentAck.pid_sender, currentAck.pid_receiver, timeBuffer);
         bW = write(outFd, buffer, strlen(buffer));
         if (bW == -1 || bW == 0)
             errExit("<Client> writing on output file failed");
