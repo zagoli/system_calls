@@ -80,7 +80,7 @@ _Noreturn int device(int nProcesso, char path[]) {
         //-------------------------------INVIO MESSAGGI-------------------------------
         //Controllo se ho messaggi
         bool vuoto = true;
-        for (int i = 0; i < MESS_DEV_MAX; ++i) {
+        for (int i = 0; i < MESS_DEV_MAX; i++) {
             if (messaggi[i].message_id != -1) {
                 vuoto = false;
                 break;
@@ -88,13 +88,13 @@ _Noreturn int device(int nProcesso, char path[]) {
         }
 
         // Se ho almeno un messaggio da inviare
-        if (vuoto == false) {
+        if (!vuoto) {
             // Per ogni messaggio
             for (int i = 0; i < MESS_DEV_MAX; i++) {
                 // Se è valido, perchè se message id = -1 allora non è un messaggio
                 if (messaggi[i].message_id != -1) {
 
-                    //Trovo i vicini CON INIZIALIZZATORE ARRAY STRANO CHE FUNZIONA SOLO SU GCC
+                    //Trovo i vicini (CON INIZIALIZZATORE ARRAY STRANO CHE FUNZIONA SOLO SU GCC)
                     pid_t vicini[NUM_DEVICES - 1] = {[0 ... NUM_DEVICES - 2] = (pid_t) -1};
                     double dist = messaggi[i].max_distance;
                     checkVicini(dist, vicini, x, y);
@@ -102,39 +102,40 @@ _Noreturn int device(int nProcesso, char path[]) {
 
                     //una volta trovati i vicini mando ad ognuno il messaggio in questione, se non l'hanno già ricevuto
                     for (int j = 0; j < NUM_DEVICES - 1; j++) {
-                        if (vicini[j] != -1) {
+                        // Se vicini in posizione j == -1, sono arrivato al punto dove non ho più vicini
+                        if (vicini[j] == -1)
+                            break;
 
-                            //Controllo se vicino ha già ricevuto il messaggio nella lista delle ack e aspetto il semaforo
-                            bool giaRicevuto = false;
-                            semOp(semidAckList, 0, -1);
-                            // scorro lista ack
-                            for (int k = 0; k < ACK_MAX; k++) {
-                                if (ackList[k].message_id == messaggi[i].message_id &&
-                                    vicini[j] == ackList[k].pid_receiver) {
-                                    giaRicevuto = true;
-                                    break;
-                                }
+                        //Controllo se vicino ha già ricevuto il messaggio nella lista delle ack e aspetto il semaforo
+                        bool giaRicevuto = false;
+                        semOp(semidAckList, 0, -1);
+                        // scorro lista ack
+                        for (int k = 0; k < ACK_MAX; k++) {
+                            if (ackList[k].message_id == messaggi[i].message_id &&
+                                vicini[j] == ackList[k].pid_receiver) {
+                                giaRicevuto = true;
+                                break;
+                            }
                             }
                             semOp(semidAckList, 0, 1);
 
                             //Se non l'ha gia ricevuto, glielo posso mandare
-                            if (giaRicevuto == false) {
-                                //Apro la fifo del device vicino
-                                char deviceVicinoFIFO[PATH_MAX];
-                                sprintf(deviceVicinoFIFO, "/tmp/dev_fifo.%d", vicini[j]);
-                                int vicinoFD = open(deviceVicinoFIFO, O_WRONLY | O_NONBLOCK);
-                                if (vicinoFD == -1)
-                                    errExit("<Device> open Fifo vicino failed");
-								// Il sender è impostato alla ricezione, manca il receiver. Non lo imposto perchè
-								// il device non se ne fa nulla del receiver: alla ricezione manda un ack dicendo che l'ha ricevuto lui
-                                //Scrivo il messaggio
-                                write(vicinoFD, &messaggi[i], sizeof(Message));
+                        if (!giaRicevuto) {
+                            //Apro la fifo del device vicino
+                            char deviceVicinoFIFO[PATH_MAX];
+                            sprintf(deviceVicinoFIFO, "/tmp/dev_fifo.%d", vicini[j]);
+                            int vicinoFD = open(deviceVicinoFIFO, O_WRONLY | O_NONBLOCK);
+                            if (vicinoFD == -1)
+                                errExit("<Device> open Fifo vicino failed");
+                            // Il sender è impostato alla ricezione, manca il receiver. Non lo imposto perchè
+                            // il device non se ne fa nulla del receiver: alla ricezione manda un ack dicendo che l'ha ricevuto lui
+                            //Scrivo il messaggio
+                            write(vicinoFD, &messaggi[i], sizeof(Message));
                                 if (close(vicinoFD) == -1)
                                     errExit("<Device> close Fifo vicino failed");
 								//dopo averlo inviato, elimino il messaggio
 								messaggi[i].message_id = -1;
                             }
-                        }
                     }
 
 
@@ -158,31 +159,27 @@ _Noreturn int device(int nProcesso, char path[]) {
             ack.pid_receiver = mypid;
             ack.timestamp = time(NULL);
 
-            //Aggiungo l'ack al segmento di memoria apposito aspettando il semaforo
-            semOp(semidAckList, 0, -1);
-            for (int i = 0; i < ACK_MAX; i++) {
-                if (ackList[i].message_id == -1) {
-                    // Scrivo messaggio in acklist ed esco dal ciclo
-                    ackList[i] = ack;
-                    break;
-                }
-            }
-            semOp(semidAckList, 0, 1);
-
-            // Controllo se questo messaggio ha 5 ack (mio compreso). Se sì, sono stato l'ultimo a riceverlo
+            //Aggiungo l'ack al segmento di memoria apposito aspettando il semaforo, mentre
+            // Controllo se questo messaggio ha già 4 ack (me escluso). Se sì, sono stato l'ultimo a riceverlo
             semOp(semidAckList, 0, -1);
             int ackSpediti = 0;
-            for (int k = 0; k < ACK_MAX && ackSpediti < NUM_DEVICES; k++) {
-                if (ackList[k].message_id == messaggio.message_id) {
+            bool set = false;
+            for (int i = 0; i < ACK_MAX; i++) {
+                if (ackList[i].message_id == -1 &&
+                    !set) { // set serve per evitare di scrivere il messaggio in ogni buco dove c'è -1
+                    // Scrivo messaggio in acklist
+                    ackList[i] = ack;
+                    set = true;
+                } else if (ackList[i].message_id == messaggio.message_id) {
                     ackSpediti++;
                 }
             }
             semOp(semidAckList, 0, 1);
 
             // Salvo il messaggio tra i miei messaggi solo se non ero l'ultimo a riceverlo
-            if (ackSpediti != NUM_DEVICES) {
-				// sarò io a spedire il messaggio, quindi il sender sono io
-				messaggio.pid_sender = mypid;
+            if (ackSpediti != NUM_DEVICES - 1) {
+                // sarò io a spedire il messaggio, quindi il sender sono io
+                messaggio.pid_sender = mypid;
                 for (int j = 0; j < MESS_DEV_MAX; j++) {
                     if (messaggi[j].message_id == -1) {
                         messaggi[j] = messaggio;
@@ -200,6 +197,7 @@ _Noreturn int device(int nProcesso, char path[]) {
         //Se casella è libera mi inserisco
         if (board[y + x * BOARD_SIDE_SIZE] == 0) {
             board[y + x * BOARD_SIDE_SIZE] = mypid;
+            // Se non sono al primo giro metto a zero la mia vecchia posizione
             if (oldX != -1 && oldY != -1) {
                 board[oldY + oldX * BOARD_SIDE_SIZE] = (pid_t) 0;
             }

@@ -104,7 +104,7 @@ int main(int argc, char *argv[]) {
         errExit("<Client> closing out file failed");
 
     // Termino
-	printf("Client dedded\n");
+    printf("Response received.\n");
 
     return 0;
 }
