@@ -94,7 +94,7 @@ int main(int argc, char *argv[]) {
     int iteration = 1;
     do {
         // ------------------ Stampa info device --------------------------------------------
-        printf("\n# Step %d: device positions ########################\n", iteration);
+        printf("\n# Step %d: device positions ##################\n", iteration);
         // Sblocco il primo semaforo dei device, dovrebbero sbloccarsi gli altri in cascata
         semOp(semidBoard, 0, 1);
         // Aspetto che ogni device stampi le sue informazioni, la riga di chiusura la stampa l'ultimo device
@@ -108,12 +108,12 @@ int main(int argc, char *argv[]) {
 
 void stopServer(int sig) {
     // Invio un SIGTERM a AckManager
-	printf("\nServer dedding ackmanager\n");
+    printf("\nServer killing ackmanager\n");
     if (kill(pidAckManager, SIGTERM) == -1)
         errExit("<Server> kill AckManager failed");
     // Invio SIGTERM a tutti i device
     for (int i = 0; i < NUM_DEVICES; i++) {
-		printf("Server dedding device with pid %d\n", pidDevices[i]);
+        printf("Server killing device with pid %d\n", pidDevices[i]);
         if (kill(pidDevices[i], SIGTERM) == -1)
             errExit("<Server> kill device failed");
     }
@@ -139,6 +139,6 @@ void stopServer(int sig) {
         errExit("<Server> remove semaphore set ackList failed");
 
     // Infine, termino
-	printf("Server ded\n");
+    printf("Server dead\n");
     exit(0);
 }

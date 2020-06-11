@@ -1,6 +1,5 @@
 /// @file device.c
 /// @brief Contiene l'implementazione dei DEVICE.
-
 #include "err_exit.h"
 #include "defines.h"
 #include "shared_memory.h"
@@ -116,10 +115,10 @@ _Noreturn int device(int nProcesso, char path[]) {
                                 giaRicevuto = true;
                                 break;
                             }
-                            }
-                            semOp(semidAckList, 0, 1);
+                        }
+                        semOp(semidAckList, 0, 1);
 
-                            //Se non l'ha gia ricevuto, glielo posso mandare
+                        //Se non l'ha gia ricevuto, glielo posso mandare
                         if (!giaRicevuto) {
                             //Apro la fifo del device vicino
                             char deviceVicinoFIFO[PATH_MAX];
@@ -131,22 +130,17 @@ _Noreturn int device(int nProcesso, char path[]) {
                             // il device non se ne fa nulla del receiver: alla ricezione manda un ack dicendo che l'ha ricevuto lui
                             //Scrivo il messaggio
                             write(vicinoFD, &messaggi[i], sizeof(Message));
-                                if (close(vicinoFD) == -1)
-                                    errExit("<Device> close Fifo vicino failed");
-								//dopo averlo inviato, elimino il messaggio
-								messaggi[i].message_id = -1;
-                            }
+                            if (close(vicinoFD) == -1)
+                                errExit("<Device> close Fifo vicino failed");
+                            //dopo averlo inviato, elimino il messaggio
+                            messaggi[i].message_id = -1;
+                        }
                     }
 
-
-                    //Svuoto la lista dei vicini per passare al prossimo messaggio
-                    for (int k = 0; k < NUM_DEVICES - 1; k++) {
-                        vicini[k] = (pid_t) -1;
-                    }
                 }
             }
         }
-		//--------------------------------------------------------------------------
+        //--------------------------------------------------------------------------
 
         //-------------------------------RICEZIONE MESSAGGI-------------------------
         //Leggo eventuali messaggi
@@ -209,20 +203,20 @@ _Noreturn int device(int nProcesso, char path[]) {
         // Stampa info device in questo stile:
         // pidD1 i_D1 j_D1 msgs: lista message_id
         printf("%d %d %d msgs: ", mypid, x, y);
-        for (int l = 0; l < MESS_DEV_MAX; l++) {
-            if (messaggi[l].message_id != -1) {
-                printf("%d ", messaggi[l].message_id);
+        for (int i = 0; i < MESS_DEV_MAX; i++) {
+            if (messaggi[i].message_id != -1) {
+                printf("%d ", messaggi[i].message_id);
             }
         }
         printf("\n");
 
         //Libero il semaforo del prossimo
-		// Se sono l'ultimo processo, invece di liberare un semaforo stampo la riga di chiusura delle info device
-		if (nProcesso != NUM_DEVICES-1){
-			semOp(semidBoard, nProcesso + 1, 1);
-		} else {
-			printf("#############################################\n");
-		}
+        // Se sono l'ultimo processo, invece di liberare un semaforo stampo la riga di chiusura delle info device
+        if (nProcesso != NUM_DEVICES - 1) {
+            semOp(semidBoard, nProcesso + 1, 1);
+        } else {
+            printf("#############################################\n");
+        }
 
     }
 
@@ -256,7 +250,7 @@ void checkVicini(double dist, pid_t vicini[], int x, int y) {
             if (board[j + i * BOARD_SIDE_SIZE] != 0) {
                 //Controllo se device è vicino
                 double distanza = (double) sqrt(((x - i) * (x - i)) + ((y - j) * (y - j)));
-				// Se distanza = 0 sono io!
+                // Se distanza = 0 sono io!
                 if (distanza <= (double) dist && distanza != 0) {
                     vicini[c] = board[j + i * BOARD_SIDE_SIZE];
                     c++;
@@ -279,6 +273,6 @@ void stopDevice(int signal) {
     if (shmdt(board) == -1) {
         errExit("<Device> detach board failed");
     }
-	printf("	Device %d dedded\n",mypid);
+    printf("	Device %d killed\n", mypid);
     exit(0);
 }

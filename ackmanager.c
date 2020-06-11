@@ -84,9 +84,10 @@ _Noreturn void ackmanager(int msgQueueKey) {
 void quit(int sig){
     if (shmdt(ackList) == -1)
         errExit("<Ackmanager> detach acklist failed");
-    if (msgctl(msqid, IPC_RMID, NULL) == -1){
-        errExit("<Ackmanager> failed to remove message queue");}
-	
-	printf("	Ackmanager dedded\n");
+    if (msgctl(msqid, IPC_RMID, NULL) == -1) {
+        errExit("<Ackmanager> failed to remove message queue");
+    }
+
+    printf("	Ackmanager killed\n");
     exit(0);
 }
