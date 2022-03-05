@@ -108,12 +108,12 @@ int main(int argc, char *argv[]) {
 
 void stopServer(int sig) {
     // Invio un SIGTERM a AckManager
-    printf("\nServer killing ackmanager\n");
+    printf("\n[Server] killing ackmanager\n");
     if (kill(pidAckManager, SIGTERM) == -1)
         errExit("<Server> kill AckManager failed");
     // Invio SIGTERM a tutti i device
     for (int i = 0; i < NUM_DEVICES; i++) {
-        printf("Server killing device with pid %d\n", pidDevices[i]);
+        printf("[Server] killing device with pid %d\n", pidDevices[i]);
         if (kill(pidDevices[i], SIGTERM) == -1)
             errExit("<Server> kill device failed");
     }
@@ -122,9 +122,9 @@ void stopServer(int sig) {
     while (wait(NULL) != -1);
     if (errno != ECHILD){
         errExit("<Server> wait for children termination failed");}
-	printf("Server successfully killed all his childrens\n");
+    printf("[Server] successfully killed all his childrens\n");
 
-	printf("Server removing garbage\n");
+    printf("[Server] removing shm and semaphores\n");
     // Rimuovo il segmento di memoria della board
     if (shmctl(boardId, IPC_RMID, NULL) == -1)
         errExit("<Server> remove board failed");
@@ -139,6 +139,6 @@ void stopServer(int sig) {
         errExit("<Server> remove semaphore set ackList failed");
 
     // Infine, termino
-    printf("Server dead\n");
+    printf("[Server] I'm dead\n");
     exit(0);
 }

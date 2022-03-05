@@ -1,39 +1,53 @@
-CFLAGS   = -Wall -std=gnu99
-INCLUDES = -I .
-OBJDIR   = obj
+CFLAGS   := -Wall -std=gnu99
+INCLUDES := -I .
+LIBS     := -lm
+OBJDIR   := obj
 
-SERVER_SRCS = defines.c err_exit.c shared_memory.c semaphore.c fifo.c server.c ackmanager.c device.c
-SERVER_OBJS = $(addprefix $(OBJDIR)/, $(SERVER_SRCS:.c=.o))
+# keep track of these files
+KEEP_TRACK := Makefile
 
-CLIENT_SRCS = client.c err_exit.c defines.c
-CLIENT_OBJS = $(addprefix $(OBJDIR)/, $(CLIENT_SRCS:.c=.o))
+SERVER_SRCS := defines.c err_exit.c shared_memory.c semaphore.c fifo.c server.c ackmanager.c device.c
+SERVER_OBJS := $(addprefix $(OBJDIR)/, $(SERVER_SRCS:.c=.o))
 
-all: $(OBJDIR) server client
+CLIENT_SRCS := defines.c err_exit.c client.c
+CLIENT_OBJS := $(addprefix $(OBJDIR)/, $(CLIENT_SRCS:.c=.o))
 
-server: $(SERVER_OBJS)
-	@echo "Making executable: "$@
-	@$(CC) $^ -o $@  -lm
+# must be first rule
+default: all
 
-client: $(CLIENT_OBJS)
-	@echo "Making executable: "$@
-	@$(CC) $^ -o $@  -lm
 
 $(OBJDIR):
 	@mkdir -p $(OBJDIR)
 
-$(OBJDIR)/%.o: %.c
-	$(CC) $(CFLAGS) $(CPPFLAGS) -o $@ -c $<
+%.h:
+	@echo "(missing header $@)"
 
-run: clean client server
+$(OBJDIR)/%.o: %.c %.h $(KEEP_TRACK)
+	$(CC) $(CFLAGS) $(INCLUDES) -c -o $@ $< $(LIBS)
+
+server: $(SERVER_OBJS)
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LIBS)
+	@echo "Server compiled."
+	@echo
+
+client: $(CLIENT_OBJS)
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LIBS)
+	@echo "Client compiled."
+	@echo
+
+
+run: server
 	@./server 100 input/file_posizioni.txt
 
 clean:
-	@rm -vf ${SERVER_OBJS}
-	@rm -vf ${CLIENT_OBJS}
+	@rm -vf $(SERVER_OBJS) $(CLIENT_OBJS)
 	@rm -vf server
 	@rm -vf client
 	@rm -vf /tmp/dev_fifo.*
 	@ipcrm -a
 	@echo "Removed object files and executables..."
 
+all: $(OBJDIR) server client
+
 .PHONY: run clean
+

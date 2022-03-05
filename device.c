@@ -227,6 +227,7 @@ void nextPositions(int posizioniFD, int *x, int *y) {
     int bR = read(posizioniFD, buf, 3);
     // se sono dopo EOF mantengo posizione corrente
     if (bR == 0)
+        // qua potrei anche decidere di tornare all'inizio del file volendo
         return;
     if (bR == -1)
         errExit("<Device> read positions failed");
@@ -273,6 +274,6 @@ void stopDevice(int signal) {
     if (shmdt(board) == -1) {
         errExit("<Device> detach board failed");
     }
-    printf("	Device %d killed\n", mypid);
+    printf("[Device] %d I'm dead\n", mypid);
     exit(0);
 }

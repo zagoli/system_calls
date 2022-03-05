@@ -88,6 +88,6 @@ void quit(int sig){
         errExit("<Ackmanager> failed to remove message queue");
     }
 
-    printf("	Ackmanager killed\n");
+    printf("[Ackmanager] I'm dead\n");
     exit(0);
 }
